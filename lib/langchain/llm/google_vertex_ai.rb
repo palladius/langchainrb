@@ -17,11 +17,10 @@ module Langchain::LLM
   #
   class GoogleVertexAi < Base
     DEFAULTS = {
-      temperature: 0.2,
+      temperature: 0.0,
       dimension: 768, # This is what the `embedding-gecko-001` model generates
       #TODO completion_model_name: "text-bison-001",
       #TODO chat_completion_model_name: "chat-bison-001",
-      #project_id: 'ricc-genai', # TODO(ricc): move below once it works!
       embeddings_model_name: "textembedding-gecko" # non "embedding-gecko-001" (palm)
     }.freeze
     LENGTH_VALIDATOR = Langchain::Utils::TokenLength::GooglePalmValidator
@@ -29,10 +28,25 @@ module Langchain::LLM
       "assistant" => "ai"
     }
 
-    def initialize(api_key_file: nil, project_id: , default_options: {})
+    # Initializes the GCP connection. Requires info for authn
+    #
+    # @param project_id [String] (mandatory) The GCP Project ID
+    # @param api_key_file [String] (optional) The GCP Project service account key (optional way to authenticate)
+    #
+    # For this to work, you need to either run
+    # * gcloud auth login
+    # * gcloud auth application-default login
+    def initialize(api_key_file: nil, project_id: nil, default_options: {})
       #depends_on 'google/cloud/ai_platform'
       #depends_on 'google/cloud/ai_platform/v1'
       #depends on "google/apis/aiplatform_v1"
+      project_id ||= ENV['GOOGLE_CLOUD_PROJECT'] # if not given, you can still provide in ENV
+      api_key_file ||= ENV['GOOGLE_CLOUD_VERTEX_AI_KEY'] # not implemented yet
+
+      puts "💛Riccardo💛 GoogleVertexAi.initiralize This is on andreibondarev side (PRIMARY SOURCE OF HACKING)"
+      puts "💛Riccardo💛 ProjectId='#{project_id}'"
+      puts "💛Riccardo💛 API Key File='#{api_key_file}'"
+
       raise "ProjectId is (now) needed as its baked into the API query" if project_id.nil?
       @project_id = project_id
 
@@ -51,6 +65,9 @@ module Langchain::LLM
     # @return [Langchain::LLM::GooglePalmResponse] Response object
     #
     def embed(text:)
+      puts "💛Riccardo💛 embed() ProjectId='#{@project_id}'"
+
+      # Single text for now. API does supports multiple texts.
       arrayOfContentHashes = [{content: text }]
       request = Google::Apis::AiplatformV1::GoogleCloudAiplatformV1PredictRequest.new(instances: arrayOfContentHashes)
 
@@ -131,7 +148,7 @@ module Langchain::LLM
       default_params.merge!(options)
 
       response = client.generate_chat_message(**default_params)
-      raise "GooglePalm API returned an error: #{response}" if response.dig("error")
+      raise "Vertex AI API returned an error: #{response}" if response.dig("error")
 
       Langchain::LLM::GooglePalmResponse.new response,
         model: default_params[:model]
